@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="FamilySync">
+<title>FamilySync — 이슬기·이루다·환이·준이</title>
+<style>
+  :root {
+    --blue:#185FA5; --blue-light:#E6F1FB; --blue-mid:#B5D4F4;
+    --green:#0F6E56; --green-light:#E1F5EE; --green-mid:#9FE1CB;
+    --purple:#534AB7; --purple-light:#EEEDFE; --purple-mid:#AFA9EC;
+    --amber:#854F0B; --amber-light:#FAEEDA; --amber-mid:#FAC775;
+    --math:#3B6D11; --math-light:#EAF3DE;
+    --eng:#639922; --church:#854F0B;
+    --red:#E24B4A; --red-light:#FCEBEB;
+    --gray:#5F5E5A; --gray-light:#F1EFE8;
+    --bg:#F5F4F0; --card:#fff;
+    --border:rgba(0,0,0,0.10);
+    --text:#1a1a1a; --text2:#6b6b6b; --text3:#999;
+    --radius:14px; --radius-sm:8px;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:var(--bg); color:var(--text); max-width:480px; margin:0 auto; min-height:100vh; }
+
+  /* ── 헤더 ── */
+  .header { background:var(--card); border-bottom:0.5px solid var(--border); padding:14px 18px 0; position:sticky; top:0; z-index:100; }
+  .header-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+  .app-title { font-size:20px; font-weight:700; color:var(--text); letter-spacing:-0.5px; }
+  .header-right { display:flex; align-items:center; gap:8px; }
+  .today-date { font-size:11px; color:var(--text2); }
+  .exam-btn { font-size:11px; padding:4px 10px; border-radius:20px; border:1px solid var(--border); background:none; color:var(--text2); cursor:pointer; font-weight:500; transition:all .15s; }
+  .exam-btn.on { background:var(--red); color:#fff; border-color:var(--red); }
+  .nav { display:flex; }
+  .nav-btn { flex:1; padding:9px 4px; font-size:11px; font-weight:600; border:none; background:none; cursor:pointer; color:var(--text2); border-bottom:2.5px solid transparent; transition:all .15s; }
+  .nav-btn.active { color:var(--blue); border-bottom-color:var(--blue); }
+
+  /* ── 공통 ── */
+  .content { padding:14px 14px 80px; }
+  .section-label { font-size:12px; font-weight:600; color:var(--text2); margin-bottom:8px; letter-spacing:.02em; }
+  .card { background:var(--card); border-radius:var(--radius); border:0.5px solid var(--border); overflow:hidden; margin-bottom:12px; }
+  .hidden { display:none !important; }
+
+  /* ── 멤버 스트립 ── */
+  .members { display:flex; gap:6px; margin-bottom:14px; }
+  .m-chip { display:flex; flex-direction:column; align-items:center; gap:4px; flex:1; cursor:pointer; }
+  .m-avatar { width:48px; height:48px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; border:2.5px solid transparent; transition:border-color .15s; }
+  .m-avatar.sel { border-color:var(--blue); }
+  .m-name { font-size:10px; color:var(--text2); font-weight:500; }
+  .m-badge { display:inline-flex; align-items:center; gap:3px; padding:2px 7px; border-radius:20px; font-size:10px; font-weight:600; max-width:78px; }
+  .m-badge .txt { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .m-dot { width:5px; height:5px; border-radius:50%; flex-shrink:0; animation:pulse 1.6s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:.25;} }
+
+  /* ── 타임테이블 ── */
+  .day-tabs { display:flex; gap:4px; margin-bottom:12px; overflow-x:auto; padding-bottom:2px; scrollbar-width:none; }
+  .day-tabs::-webkit-scrollbar { display:none; }
+  .day-tab { flex-shrink:0; padding:6px 12px; border-radius:var(--radius-sm); font-size:12px; font-weight:600; cursor:pointer; border:1px solid var(--border); background:var(--card); color:var(--text2); transition:all .15s; }
+  .day-tab.active { background:var(--blue); color:#fff; border-color:var(--blue); }
+  .day-tab.exam { border-color:var(--red); color:var(--red); }
+  .day-tab.exam.active { background:var(--red); color:#fff; }
+
+  .tt-card { background:var(--card); border-radius:var(--radius); border:0.5px solid var(--border); overflow:hidden; margin-bottom:12px; }
+  .tt-header { padding:12px 16px; border-bottom:0.5px solid var(--border); display:flex; align-items:center; gap:10px; }
+  .tt-av { width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; flex-shrink:0; }
+  .tt-name { font-size:14px; font-weight:600; color:var(--text); }
+  .tt-role { font-size:11px; color:var(--text2); margin-top:1px; }
+
+  .tt-row { display:flex; align-items:flex-start; padding:9px 16px; border-bottom:0.5px solid var(--border); gap:10px; position:relative; }
+  .tt-row:last-child { border-bottom:none; }
+  .tt-row.now { background:rgba(24,95,165,.05); }
+  .tt-row.meal { background:rgba(239,159,39,.05); }
+  .tt-row.exam-row { background:rgba(226,75,74,.05); }
+  .now-bar { position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--blue); border-radius:0 2px 2px 0; }
+  .meal-bar { position:absolute; left:0; top:0; bottom:0; width:3px; background:#EF9F27; border-radius:0 2px 2px 0; }
+  .exam-bar { position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--red); border-radius:0 2px 2px 0; }
+  .dawn-bar { position:absolute; left:0; top:0; bottom:0; width:3px; background:#FAC775; border-radius:0 2px 2px 0; }
+
+  .tc { min-width:44px; flex-shrink:0; padding-top:1px; }
+  .tc-s { font-size:11px; color:var(--text2); display:block; }
+  .tc-e { font-size:10px; color:var(--text3); display:block; }
+  .pill { flex:1; padding:6px 10px; border-radius:var(--radius-sm); font-size:12px; font-weight:600; line-height:1.35; min-width:0; }
+  .pill-sub { font-size:10px; opacity:.75; margin-top:2px; font-weight:400; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .row-ic { font-size:14px; width:20px; text-align:center; padding-top:5px; flex-shrink:0; }
+
+  /* ── 실시간 위치 ── */
+  .map-wrap { position:relative; width:100%; height:320px; overflow:hidden; background:#e8efe4; }
+  .map-compass { position:absolute; top:10px; right:10px; width:28px; height:28px; background:rgba(255,255,255,.92); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:#333; border:0.5px solid rgba(0,0,0,.1); z-index:30; }
+  .place-pin { position:absolute; display:flex; flex-direction:column; align-items:center; transform:translate(-50%,-50%); z-index:5; pointer-events:none; }
+  .pdot { width:9px; height:9px; border-radius:50%; border:1.5px solid rgba(255,255,255,.95); }
+  .plbl { font-size:8px; font-weight:600; background:rgba(255,255,255,.93); padding:1px 4px; border-radius:5px; margin-top:2px; white-space:nowrap; color:#222; border:0.5px solid rgba(0,0,0,.08); }
+  .person-pin { position:absolute; display:flex; flex-direction:column; align-items:center; transform:translate(-50%,-100%); z-index:20; }
+  .pp-circle { width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; border:2.5px solid #fff; box-shadow:0 2px 8px rgba(0,0,0,.22); }
+  .pp-tail { width:0; height:0; border-left:5px solid transparent; border-right:5px solid transparent; margin-top:-1px; }
+  .pp-name { font-size:9px; font-weight:600; background:rgba(255,255,255,.93); padding:1px 5px; border-radius:8px; margin-top:2px; white-space:nowrap; border:0.5px solid rgba(0,0,0,.07); }
+
+  .live-list { padding:0; }
+  .live-row { display:flex; align-items:center; gap:10px; padding:11px 16px; border-bottom:0.5px solid var(--border); }
+  .live-row:last-child { border-bottom:none; }
+  .live-av { width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; flex-shrink:0; }
+  .live-place { font-size:13px; font-weight:600; color:var(--text); }
+  .live-addr { font-size:10px; color:var(--text2); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ret-label { font-size:9px; color:var(--text2); }
+  .ret-time { font-size:14px; font-weight:700; color:var(--text); }
+  .ret-soon { font-size:13px; font-weight:700; color:var(--red); }
+  .ret-done { font-size:11px; font-weight:600; color:var(--green); }
+  .live-dot { width:6px; height:6px; border-radius:50%; display:inline-block; vertical-align:middle; margin-right:4px; animation:pulse 1.6s infinite; }
+
+  /* ── 체류 분석 ── */
+  .stats-sel { font-size:12px; border:1px solid var(--border); border-radius:var(--radius-sm); padding:5px 10px; background:var(--card); color:var(--text); }
+  .legend { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; }
+  .legend-item { display:flex; align-items:center; gap:5px; font-size:11px; color:var(--text2); }
+  .legend-dot { width:10px; height:10px; border-radius:2px; flex-shrink:0; }
+
+  /* ── 수정/조정 ── */
+  .edit-header { padding:12px 16px; border-bottom:0.5px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+  .edit-title { font-size:14px; font-weight:600; color:var(--text); }
+  .add-btn { font-size:11px; padding:5px 12px; border:1px solid var(--blue); border-radius:var(--radius-sm); background:none; color:var(--blue); cursor:pointer; font-weight:600; }
+  .edit-row { display:flex; align-items:flex-start; gap:10px; padding:10px 16px; border-bottom:0.5px solid var(--border); }
+  .edit-row:last-child { border-bottom:none; }
+  .edit-dot { width:9px; height:9px; border-radius:50%; flex-shrink:0; margin-top:3px; }
+  .edit-time { font-size:11px; color:var(--text2); white-space:nowrap; margin-left:auto; }
+  .edit-more { font-size:18px; color:var(--text2); cursor:pointer; padding:0 4px; line-height:1; flex-shrink:0; }
+
+  /* ── 시험기간 배너 ── */
+  .exam-banner { background:var(--red-light); border:0.5px solid #F7C1C1; border-radius:var(--radius-sm); padding:10px 14px; margin-bottom:12px; display:flex; align-items:center; justify-content:space-between; }
+  .exam-add-btn { font-size:11px; padding:4px 10px; border:1px solid var(--red); border-radius:var(--radius-sm); background:none; color:var(--red); cursor:pointer; font-weight:600; white-space:nowrap; }
+
+  /* ── 정보 박스 ── */
+  .info-box { background:#EBF4FF; border-radius:var(--radius-sm); padding:10px 14px; font-size:11px; color:#185FA5; line-height:1.7; margin-bottom:12px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-top">
+    <span class="app-title">FamilySync</span>
+    <div class="header-right">
+      <span class="today-date" id="today-date"></span>
+      <button class="exam-btn" id="exam-btn" onclick="toggleExam()">시험기간</button>
+    </div>
+  </div>
+  <div class="nav">
+    <button class="nav-btn active" onclick="showTab('tt',this)">타임테이블</button>
+    <button class="nav-btn" onclick="showTab('live',this)">실시간 위치</button>
+    <button class="nav-btn" onclick="showTab('stats',this)">체류 분석</button>
+    <button class="nav-btn" onclick="showTab('edit',this)">수정/조정</button>
+  </div>
+</div>
+
+<div class="content">
+
+  <!-- ══ 타임테이블 ══ -->
+  <div id="tab-tt">
+    <div class="members" id="members-strip"></div>
+    <div id="exam-banner-tt" class="hidden"></div>
+    <div class="day-tabs" id="day-tabs">
+      <div class="day-tab" onclick="selDay('mon',this)">월</div>
+      <div class="day-tab" onclick="selDay('tue',this)">화</div>
+      <div class="day-tab" onclick="selDay('wed',this)">수</div>
+      <div class="day-tab" onclick="selDay('thu',this)">목</div>
+      <div class="day-tab" onclick="selDay('fri',this)">금</div>
+      <div class="day-tab" onclick="selDay('sat',this)">토</div>
+      <div class="day-tab" onclick="selDay('sun',this)">일</div>
+    </div>
+    <div id="tt-content"></div>
+  </div>
+
+  <!-- ══ 실시간 위치 ══ -->
+  <div id="tab-live" class="hidden">
+    <p class="section-label">지금 우리 가족 위치</p>
+    <div class="card">
+      <div class="map-wrap" id="mapWrap">
+        <div id="mapSvg"></div>
+        <div class="map-compass">N</div>
+        <div id="place-pins"></div>
+        <div class="person-pin" id="pp0"><div class="pp-circle" style="background:#B5D4F4;color:#185FA5;">슬기</div><div class="pp-tail" style="border-left:5px solid transparent;border-right:5px solid transparent;border-top:7px solid #B5D4F4;"></div><div class="pp-name" style="color:#185FA5;">아빠</div></div>
+        <div class="person-pin" id="pp1"><div class="pp-circle" style="background:#9FE1CB;color:#0F6E56;">루다</div><div class="pp-tail" style="border-left:5px solid transparent;border-right:5px solid transparent;border-top:7px solid #9FE1CB;"></div><div class="pp-name" style="color:#0F6E56;">엄마</div></div>
+        <div class="person-pin" id="pp2"><div class="pp-circle" style="background:#EEEDFE;color:#534AB7;">환이</div><div class="pp-tail" style="border-left:5px solid transparent;border-right:5px solid transparent;border-top:7px solid #EEEDFE;"></div><div class="pp-name" style="color:#534AB7;">환이</div></div>
+        <div class="person-pin" id="pp3"><div class="pp-circle" style="background:#FAC775;color:#854F0B;">준이</div><div class="pp-tail" style="border-left:5px solid transparent;border-right:5px solid transparent;border-top:7px solid #FAC775;"></div><div class="pp-name" style="color:#854F0B;">준이</div></div>
+      </div>
+      <div class="live-list" id="live-list"></div>
+    </div>
+    <div class="info-box">안심존 등록: 중흥고 · 중흥중 · 수학/영어/국어학원 · 인천시교육청 · 인천작전초 · 교회 · 약대교회 · 집</div>
+  </div>
+
+  <!-- ══ 체류 분석 ══ -->
+  <div id="tab-stats" class="hidden">
+    <div class="card" style="padding:14px 16px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <p class="section-label" style="margin:0;">오늘의 체류 분석</p>
+        <select class="stats-sel" id="stats-sel" onchange="updateCharts()">
+          <option value="0">이슬기 (아빠)</option>
+          <option value="1">이루다 (엄마)</option>
+          <option value="2">환이 (고1)</option>
+          <option value="3">준이 (중1)</option>
+        </select>
+      </div>
+      <div class="legend" id="pie-legend"></div>
+      <div style="position:relative;width:100%;height:200px;">
+        <canvas id="pieChart" role="img" aria-label="장소별 체류 시간 비율 도넛 차트">장소별 체류 시간 비율</canvas>
+      </div>
+    </div>
+    <div class="card" style="padding:14px 16px;">
+      <p class="section-label" style="margin-bottom:10px;">오늘 타임라인</p>
+      <div style="position:relative;width:100%;height:220px;">
+        <canvas id="barChart" role="img" aria-label="시간대별 장소 타임라인 바 차트">시간대별 타임라인</canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ 수정/조정 ══ -->
+  <div id="tab-edit" class="hidden">
+    <div id="edit-cards"></div>
+    <div style="text-align:center;margin-top:12px;padding-bottom:20px;">
+      <p style="font-size:11px;color:var(--text2);line-height:1.6;">일정 변경은 Claude에게 요청 후<br>새 index.html을 GitHub에 업로드하세요.</p>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+// ════════════════════════════════════════
+//  데이터: 가족 정보
+// ════════════════════════════════════════
+const MEMBERS = [
+  { name:'이슬기', label:'아빠', short:'슬', color:'#185FA5', bg:'#B5D4F4' },
+  { name:'이루다', label:'엄마', short:'루', color:'#0F6E56', bg:'#9FE1CB' },
+  { name:'환이',   label:'고1',  short:'환', color:'#534AB7', bg:'#EEEDFE' },
+  { name:'준이',   label:'중1',  short:'준', color:'#854F0B', bg:'#FAC775' },
+];
+
+// ════════════════════════════════════════
+//  데이터: 장소 좌표 (직접 제공 정확값)
+// ════════════════════════════════════════
+const LOCS = {
+  home:    { lat:37.503261, lng:126.767484, lbl:'🏠 집',         dot:'#185FA5' },
+  hwanSch: { lat:37.508389, lng:126.768687, lbl:'🏫 중흥고',     dot:'#534AB7' },
+  junSch:  { lat:37.505640, lng:126.775811, lbl:'🏫 중흥중',     dot:'#BA7517' },
+  math:    { lat:37.507679, lng:126.753172, lbl:'📚 수학학원',   dot:'#3B6D11' },
+  eng:     { lat:37.499705, lng:126.775269, lbl:'📖 영어학원',   dot:'#639922' },
+  yakdae:  { lat:37.511094, lng:126.774599, lbl:'🎻 약대교회',   dot:'#854F0B' },
+  church:  { lat:37.504100, lng:126.750562, lbl:'⛪ 교회',       dot:'#854F0B' },
+  momWork: { lat:37.527,    lng:126.731,    lbl:'🏫 인천작전초', dot:'#0F6E56' },
+  dadWork: { lat:37.457126, lng:126.703518, lbl:'🏢 인천교육청', dot:'#185FA5' },
+};
+
+const V = { minLat:37.440, maxLat:37.540, minLng:126.700, maxLng:126.800 };
+const MW = 480, MH = 320;
+
+function toXY(lat, lng) {
+  return {
+    x: (lng - V.minLng) / (V.maxLng - V.minLng) * MW,
+    y: (1 - (lat - V.minLat) / (V.maxLat - V.minLat)) * MH
+  };
+}
+
+function mid(k1,k2){ return { lat:(LOCS[k1].lat+LOCS[k2].lat)/2, lng:(LOCS[k1].lng+LOCS[k2].lng)/2 }; }
+const MID = {
+  BI:   mid('home','dadWork'),  IB:   mid('dadWork','home'),
+  BmI:  mid('home','momWork'),  ImB:  mid('momWork','home'),
+  h_c:  mid('home','church'),   c_h:  mid('church','home'),
+  hs_h: mid('hwanSch','home'),  h_m:  mid('home','math'),
+  m_h:  mid('math','home'),     js_m: mid('junSch','math'),
+  js_h: mid('junSch','home'),   h_e:  mid('home','eng'),
+  e_h:  mid('eng','home'),      h_y:  mid('home','yakdae'),
+  y_h:  mid('yakdae','home'),   c_k:  mid('church','eng'),
+  k_h:  mid('eng','home'),
+};
+
+// ════════════════════════════════════════
+//  데이터: 주소 텍스트
+// ════════════════════════════════════════
+const A = {
+  home:'경기 부천시 길주로 234',
+  ch:'부천 원미구 소향로 25 (우리 교회)',
+  math:'부천 원미구 송내대로265번길 85 (수학학원)',
+  eng:'부천 원미구 조마루로285번길 50 (영어학원)',
+  kor:'부천시 국어학원',
+  dw:'인천 남동구 구월로 119 (인천시교육청)',
+  mw:'인천 계양구 주부토로 456 (인천작전초)',
+  hs:'부천 원미구 계남로 171 (중흥고등학교)',
+  js:'부천 원미구 신흥로 245 (중흥중학교)',
+  yd:'부천시 약대교회 (오케스트라)',
+};
+
+// ════════════════════════════════════════
+//  이벤트 헬퍼
+// ════════════════════════════════════════
+const mv    = (s,e,l,a,mk,ic)  => ({s,e,l,ic:ic||'🚇',a,mv:true,mk});
+const mvBk  = (s,e,l,a,mk)     => ({s,e,l,ic:'🚲',a,mv:true,mk});
+const mvBus = (s,e,l,a,mk)     => ({s,e,l,ic:'🚌',a,mv:true,mk});
+const meal  = (s,e,a,n)        => ({s,e,l:'저녁 식사'+(n?` (${n})`:''),ic:'🍚',a,isMeal:true});
+const dawn  = (s,e,l,a,lk)    => ({s,e,l,ic:'🌅',a,lk,isDawn:true});
+
+// ════════════════════════════════════════
+//  스케줄 데이터
+// ════════════════════════════════════════
+const SD = {
+  // ── 아빠 (이슬기) ──
+  // 평일: 05:00기상→05:30자전거→교회새벽예배05:40~06:20→06:30귀가→07:45지하철출근→18:00퇴근→19:00귀가
+  0: {
+    wk: [
+      dawn(300,330,'기상 · 준비',A.home,'home'),
+      mvBk(330,340,'자전거 이동',A.ch,'h_c'),
+      {s:340,e:400,l:'새벽 예배',ic:'⛪',a:A.ch,lk:'church',isDawn:true},
+      mvBk(400,410,'귀가 (자전거)',A.home,'c_h'),
+      {s:410,e:465,l:'집 · 아침 준비',ic:'🏠',a:A.home,lk:'home'},
+      mv(465,515,'출근 이동 (지하철)',A.dw,'BI','🚇'),
+      {s:515,e:1080,l:'인천시교육청',ic:'🏢',a:A.dw,lk:'dadWork'},
+      mv(1080,1140,'귀가 이동 (지하철)',A.home,'IB','🚇'),
+      {s:1140,e:1440,l:'집',ic:'🏠',a:A.home,lk:'home'},
+    ],
+    sat: [
+      {s:300,e:1440,l:'집 / 휴식',ic:'🏠',a:A.home,lk:'home'},
+    ],
+    sun: [
+      {s:300,e:630,l:'집',ic:'🏠',a:A.home,lk:'home'},
+      mvBk(630,645,'자전거 이동',A.ch,'h_c'),
+      {s:645,e:860,l:'교회 예배',ic:'⛪',a:A.ch,lk:'church'},
+      mvBk(860,880,'귀가 (자전거)',A.home,'c_h'),
+      {s:880,e:1440,l:'집',ic:'🏠',a:A.home,lk:'home'},
+    ],
+  },
+
+  // ── 엄마 (이루다) ──
+  // 평일: 06:00기상→07:40지하철출근(30분)→08:10작전초→16:30퇴근→17:00귀가
+  1: {
+    wk: [
+      dawn(360,460,'기상 · 아침 준비',A.home,'home'),
+      mv(460,490,'출근 이동 (지하철)',A.mw,'BmI','🚇'),
+      {s:490,e:990,l:'인천작전초등학교',ic:'🏫',a:A.mw,lk:'momWork'},
+      mv(990,1020,'귀가 이동 (지하철)',A.home,'ImB','🚇'),
+      {s:1020,e:1440,l:'집',ic:'🏠',a:A.home,lk:'home'},
+    ],
+    sat: [
+      {s:360,e:1440,l:'집 / 휴식',ic:'🏠',a:A.home,lk:'home'},
+    ],
+    sun: [
+      {s:360,e:630,l:'집',ic:'🏠',a:A.home,lk:'home'},
+      mvBk(630,645,'자전거 이동',A.ch,'h_c'),
+      {s:645,e:860,l:'교회 예배',ic:'⛪',a:A.ch,lk:'church'},
+      mvBk(860,880,'귀가 (자전거)',A.home,'c_h'),
+      {s:880,e:1440,l:'집',ic:'🏠',a:A.home,lk:'home'},
+    ],
+  },
+
+  // ── 환이 (고1) ──
+  2: {
+    // 월/수/금: 기상→등교→학교→집→저녁→자전거수학학원→귀가
+    mwf: [
+      dawn(360,510,'기상 · 아침 준비',A.home,'home'),
+      mvBus(510,530,'등교 이동',A.hs,'hs_h'),
+      {s:530,e:960,l:'중흥고등학교',ic:'🏫',a:A.hs,lk:'hwanSch'},
+      mvBus(960,980,'귀가 이동',A.home,'hs_h'),
+      meal(980,1020,A.home),
+      mvBk(1020,1035,'자전거 이동',A.math,'h_m'),
+      {s:1035,e:1260,l:'수학학원 (17:30~21:00)',ic:'📚',a:A.math,lk:'math'},
+      mvBus(1260,1280,'귀가 이동',A.home,'m_h'),
+      {s:1280,e:1440,l:'집',ic:'🏠',a:A.home,lk:'home'},
+    ],
+    // 화: 기상→등교→학교→집→저녁→영어학원→귀가
+    tue: [
+      dawn(360,510,'기상 · 아침 준비',A.home,'home'),
+      mvBus(510,530,'등교 이동',A.hs,'hs_h'),
+      {s:530,e:1020,l:'중흥고등학교',ic:'🏫',a:A.hs,lk:'hwanSch'},
+      mvBus(1020,1040,'귀가 이동',A.home,'hs_h'),
+      meal(1040,1090,A.home),
+      mvBus(1090,1105,'학원 이동',A.eng,'h_e'),
+      {s:1105,e:1320,l:'영어학원 (19:00~22:00)',ic:'📖',a:A.eng,lk:'eng'},
+      mvBus(1320,1340,'귀가 이동',A.home,'e_h'),
+      {s:1340,e:1440,l:'집',ic:'🏠',a:A.home,lk:'home'},
+    ],
+    // 목: 화와 동일
+    thu: [
+      dawn(360,510,'기상 · 아침 준비',A.home,'home'),
+      mvBus(510,530,'등교 이동',A.hs,'hs_h'),
+      {s:530,e:960,l:'중흥고등학교',ic:'🏫',a:A.hs,lk:'hwanSch'},
+      mvBus(960,980,'귀가 이동',A.home,'hs_h'),
+      meal(980,1030,A.home),
+      mvBus(1030,1045,'학원 이동',A.eng,'h_e'),
+      {s:1045,e:1320,l:'영어학원 (19:00~22:00)',ic:'📖',a:A.eng,lk:'eng'},
+      mvBus(1320,1340,'귀가 이동',A.home,'e_h'),
+      {s:1340,e:1440,l:'집',ic:'🏠',a:A.home,lk:'home'},
+    ],
+    // 토: 집→교회찬양팀17~18→밖에서저녁→국어학원18~21→귀가
+    sat: [
+      {s:360,e:1020,l:'집 / 자유시간',ic:'🏠',a:A.home,lk:'home'},
+      mvBk(1020,1030,'자전거 이동',A.ch,'h_c'),
+      {s:1030,e:1080,l:'교회 찬양팀 (17:00~18:00)',ic:'⛪',a:A.ch,lk:'church'},
+      meal(1080,1095,A.ch,'밖에서'),
+      mvBus(1095,1105,'학원 이동',A.kor,'c_k'),
+      {s:1105,e:1260,l:'국어학원 (18:00~21:00)',ic:'📝',a:A.kor,lk:'eng'},
+      mvBus(1260,1280,'귀가 이동',A.home,'k_h'),
+      {s:1280,e:1440,l:'집',ic:'🏠',a:A.home,lk:'home'},
+    ],
+    // 일: 집→교회예배11시→12:10귀가
+    sun: [
+      {s:360,e:630,l:'집',ic:'🏠',a:A.home,lk:'home'},
+      mvBk(630,645,'자전거 이동',A.ch,'h_c'),
+      {s:645,e:730,l:'교회 예배 (11:00~12:10)',ic:'⛪',a:A.ch,lk:'church'},
+      mvBus(730,750,'귀가 이동',A.home,'c_h'),
+      {s:750,e:1440,l:'집',ic:'🏠',a:A.home,lk:'home'},
+    ],
+  },
+
+  // ── 준이 (중1) ──
+  3: {
+    // 월/수/금: 기상→등교→학교→바로수학학원→귀가→저녁
+    mwf: [
+      dawn(360,510,'기상 · 아침 준비',A.home,'home'),
+      mvBus(510,525,'등교 이동',A.js,'js_h'),
+      {s:525,e:930,l:'중흥중학교',ic:'🏫',a:A.js,lk:'junSch'},
+      mvBus(930,950,'학원 이동',A.math,'js_m'),
+      {s:950,e:1170,l:'수학학원 (16:00~19:30)',ic:'📚',a:A.math,lk:'math'},
+      mvBus(1170,1190,'귀가 이동',A.home,'m_h'),
+      meal(1190,1230,A.home),
+      {s:1230,e:1440,l:'집',ic:'🏠',a:A.home,lk:'home'},
+    ],
+    // 화: 기상→등교→학교→집→저녁→영어학원→귀가
+    tue: [
+      dawn(360,510,'기상 · 아침 준비',A.home,'home'),
+      mvBus(510,525,'등교 이동',A.js,'js_h'),
+      {s:525,e:980,l:'중흥중학교',ic:'🏫',a:A.js,lk:'junSch'},
+      mvBus(980,1000,'귀가 이동',A.home,'js_h'),
+      meal(1000,1060,A.home),
+      mvBus(1060,1075,'학원 이동',A.eng,'h_e'),
+      {s:1075,e:1260,l:'영어학원 (18:20~21:00)',ic:'📖',a:A.eng,lk:'eng'},
+      mvBus(1260,1280,'귀가 이동',A.home,'e_h'),
+      {s:1280,e:1440,l:'집',ic:'🏠',a:A.home,lk:'home'},
+    ],
+    // 목: 화와 동일
+    thu: [
+      dawn(360,510,'기상 · 아침 준비',A.home,'home'),
+      mvBus(510,525,'등교 이동',A.js,'js_h'),
+      {s:525,e:980,l:'중흥중학교',ic:'🏫',a:A.js,lk:'junSch'},
+      mvBus(980,1000,'귀가 이동',A.home,'js_h'),
+      meal(1000,1060,A.home),
+      mvBus(1060,1075,'학원 이동',A.eng,'h_e'),
+      {s:1075,e:1260,l:'영어학원 (18:20~21:00)',ic:'📖',a:A.eng,lk:'eng'},
+      mvBus(1260,1280,'귀가 이동',A.home,'e_h'),
+      {s:1280,e:1440,l:'집',ic:'🏠',a:A.home,lk:'home'},
+    ],
+    // 토: 집→오케스트라10~12(약대교회)→집→교회찬양팀17~18→귀가저녁
+    sat: [
+      {s:360,e:615,l:'집',ic:'🏠',a:A.home,lk:'home'},
+      mvBus(615,630,'이동',A.yd,'h_y'),
+      {s:630,e:720,l:'오케스트라 연습 (10:00~12:00)',ic:'🎻',a:A.yd,lk:'yakdae'},
+      mvBus(720,740,'귀가 이동',A.home,'y_h'),
+      {s:740,e:1020,l:'집 / 자유시간',ic:'🏠',a:A.home,lk:'home'},
+      mvBk(1020,1030,'자전거 이동',A.ch,'h_c'),
+      {s:1030,e:1080,l:'교회 찬양팀 (17:00~18:00)',ic:'⛪',a:A.ch,lk:'church'},
+      meal(1080,1110,A.home,'귀가 후'),
+      {s:1110,e:1440,l:'집',ic:'🏠',a:A.home,lk:'home'},
+    ],
+    // 일: 집→교회예배11시→12:10귀가
+    sun: [
+      {s:360,e:630,l:'집',ic:'🏠',a:A.home,lk:'home'},
+      mvBus(630,645,'이동',A.ch,'h_c'),
+      {s:645,e:730,l:'교회 예배 (11:00~12:10)',ic:'⛪',a:A.ch,lk:'church'},
+      mvBus(730,750,'귀가 이동',A.home,'c_h'),
+      {s:750,e:1440,l:'집',ic:'🏠',a:A.home,lk:'home'},
+    ],
+  },
+};
+
+// 시험기간 추가 일정
+const EXAM = {
+  2: { sat:[{s:900,e:960,l:'시험기간 자율학습',ic:'📝',a:A.home,lk:'home',isExam:true}] },
+  3: { sat:[{s:780,e:900,l:'시험기간 자율학습',ic:'📝',a:A.home,lk:'home',isExam:true}] },
+};
+
+// ════════════════════════════════════════
+//  유틸
+// ════════════════════════════════════════
+const DAYKEYS = ['sun','mon','tue','wed','thu','fri','sat'];
+const DAYTABS = ['mon','tue','wed','thu','fri','sat','sun'];
+function getNow(){ const n=new Date(); return n.getHours()*60+n.getMinutes(); }
+function getTK(){ return DAYKEYS[new Date().getDay()]; }
+function mToT(m){ return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'); }
+
+function getEvs(mi, day){
+  const d = SD[mi], tk = day || getTK();
+  let evs;
+  if(mi<=1){ evs = tk==='sat'?d.sat:tk==='sun'?d.sun:d.wk; }
+  else {
+    if(tk==='tue') evs=d.tue||[];
+    else if(tk==='thu') evs=d.thu||[];
+    else if(tk==='sat') evs=d.sat||[];
+    else if(tk==='sun') evs=d.sun||[];
+    else evs=d.mwf||[];
+  }
+  evs = [...(evs||[])].filter(e=>e.s!==e.e);
+  if(examMode && EXAM[mi] && EXAM[mi][tk]){
+    evs = [...evs, ...EXAM[mi][tk]].sort((a,b)=>a.s-b.s);
+  }
+  return evs;
+}
+
+function getCur(mi){
+  const now=getNow(), evs=getEvs(mi);
+  for(const e of evs) if(now>=e.s&&now<e.e) return e;
+  return {l:'취침 중',ic:'🌙',a:A.home,lk:'home'};
+}
+
+function getRet(mi){
+  const evs=getEvs(mi), now=getNow();
+  for(let i=evs.length-1;i>=0;i--){
+    const l=evs[i].l;
+    if((l.includes('집')||l.includes('취침'))&&!l.includes('이동'))
+      return evs[i].s<=now?null:evs[i].s;
+  }
+  return null;
+}
+
+function getCoord(ev){
+  if(ev.mv&&ev.mk&&MID[ev.mk]) return MID[ev.mk];
+  if(ev.lk&&LOCS[ev.lk]) return LOCS[ev.lk];
+  return LOCS.home;
+}
+
+function getBadge(l){
+  if(!l) return {bg:'#F1EFE8',dot:'#888',tc:'#5F5E5A'};
+  if(l.includes('교육청')) return {bg:'#E6F1FB',dot:'#185FA5',tc:'#185FA5'};
+  if(l.includes('작전초')) return {bg:'#E1F5EE',dot:'#0F6E56',tc:'#0F6E56'};
+  if(l.includes('중흥고')) return {bg:'#EEEDFE',dot:'#534AB7',tc:'#534AB7'};
+  if(l.includes('중흥중')) return {bg:'#FEF3E2',dot:'#BA7517',tc:'#854F0B'};
+  if(l.includes('수학학원')) return {bg:'#EAF3DE',dot:'#3B6D11',tc:'#3B6D11'};
+  if(l.includes('영어학원')||l.includes('국어학원')) return {bg:'#EAF3DE',dot:'#639922',tc:'#3B6D11'};
+  if(l.includes('오케스트라')||l.includes('약대')) return {bg:'#EAF3DE',dot:'#639922',tc:'#3B6D11'};
+  if(l.includes('교회')||l.includes('찬양')||l.includes('예배')||l.includes('새벽')) return {bg:'#FAEEDA',dot:'#854F0B',tc:'#854F0B'};
+  if(l.includes('저녁')||l.includes('식사')) return {bg:'#FAEEDA',dot:'#EF9F27',tc:'#854F0B'};
+  if(l.includes('기상')||l.includes('준비')) return {bg:'#E1F5EE',dot:'#0F6E56',tc:'#0F6E56'};
+  if(l.includes('이동')||l.includes('귀가')||l.includes('출근')||l.includes('등교')) return {bg:'#F1EFE8',dot:'#888',tc:'#5F5E5A'};
+  return {bg:'#E1F5EE',dot:'#0F6E56',tc:'#0F6E56'};
+}
+
+// ════════════════════════════════════════
+//  상태
+// ════════════════════════════════════════
+let curM = 0, curDay = getTK(), examMode = false;
+let pieCI = null, barCI = null;
+
+// ════════════════════════════════════════
+//  탭 전환
+// ════════════════════════════════════════
+function showTab(tab, btn){
+  ['tt','live','stats','edit'].forEach(t=>document.getElementById('tab-'+t).classList.add('hidden'));
+  document.getElementById('tab-'+tab).classList.remove('hidden');
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  if(tab==='live'){ buildMap(); updatePins(); renderLiveList(); }
+  if(tab==='stats') setTimeout(initCharts,50);
+  if(tab==='edit') renderEdit();
+}
+
+// ════════════════════════════════════════
+//  시험기간 토글
+// ════════════════════════════════════════
+function toggleExam(){
+  examMode = !examMode;
+  const btn = document.getElementById('exam-btn');
+  btn.classList.toggle('on', examMode);
+  btn.textContent = examMode ? '✓ 시험기간' : '시험기간';
+  document.querySelectorAll('.day-tab').forEach((t,i)=>{
+    const d = DAYTABS[i];
+    if(examMode&&(d==='sat'||d==='sun')) t.classList.add('exam');
+    else t.classList.remove('exam');
+  });
+  renderBanner();
+  renderTT();
+}
+
+function renderBanner(){
+  const el = document.getElementById('exam-banner-tt');
+  if(examMode){
+    el.classList.remove('hidden');
+    el.innerHTML = `<div class="exam-banner">
+      <div><div style="font-size:12px;font-weight:600;color:#A32D2D;">📋 시험기간 모드 켜짐</div>
+      <div style="font-size:11px;color:#E24B4A;margin-top:2px;">주말 자율학습 일정이 추가됩니다</div></div>
+      <button class="exam-add-btn">일정 추가</button>
+    </div>`;
+  } else { el.classList.add('hidden'); }
+}
+
+// ════════════════════════════════════════
+//  타임테이블
+// ════════════════════════════════════════
+function renderMembersStrip(){
+  document.getElementById('members-strip').innerHTML = MEMBERS.map((m,i)=>{
+    const ev = getCur(i), lbl = ev?ev.l:'—', bs = getBadge(lbl);
+    const disp = lbl.length>8 ? lbl.slice(0,8)+'…' : lbl;
+    return `<div class="m-chip" onclick="selMember(${i},this)">
+      <div class="m-avatar${i===curM?' sel':''}" style="background:${m.bg};color:${m.color};">${m.label}</div>
+      <span class="m-name">${m.name}</span>
+      <span class="m-badge" style="background:${bs.bg};color:${bs.tc};">
+        <span class="m-dot" style="background:${bs.dot};"></span>
+        <span class="txt">${disp}</span>
+      </span>
+    </div>`;
+  }).join('');
+}
+
+function selMember(i, el){
+  curM = i;
+  document.querySelectorAll('.m-chip .m-avatar').forEach(a=>a.classList.remove('sel'));
+  el.querySelector('.m-avatar').classList.add('sel');
+  renderTT();
+}
+
+function selDay(day, el){
+  curDay = day;
+  document.querySelectorAll('.day-tab').forEach(d=>d.classList.remove('active'));
+  el.classList.add('active');
+  renderTT();
+}
+
+function renderTT(){
+  const m = MEMBERS[curM], evs = getEvs(curM, curDay);
+  const now = getNow(), isToday = curDay===getTK();
+  let html = `<div class="tt-card"><div class="tt-header">
+    <div class="tt-av" style="background:${m.bg};color:${m.color};">${m.short}</div>
+    <div><div class="tt-name">${m.name}</div><div class="tt-role">${m.label}${examMode?' · 시험기간':''}</div></div>
+  </div>`;
+  if(!evs.length){ html+=`<div class="tt-row"><span style="font-size:13px;color:var(--text2);">일정 없음</span></div>`; }
+  else { evs.forEach(e=>{
+    const isNow = isToday&&now>=e.s&&now<e.e;
+    const cls = 'tt-row'+(isNow?' now':e.isMeal?' meal':e.isExam?' exam-row':'');
+    const bar = isNow?'<div class="now-bar"></div>':e.isMeal?'<div class="meal-bar"></div>':e.isExam?'<div class="exam-bar"></div>':e.isDawn?'<div class="dawn-bar"></div>':'';
+    const nowTag = isNow?` <span style="font-size:10px;opacity:.7;">◀ 지금</span>`:'';
+    let pillStyle = 'background:#F0F0F0;color:#444;';
+    if(e.lk&&LOCS[e.lk]){ const c=LOCS[e.lk].dot; pillStyle=`background:${c}22;color:${c};`; }
+    if(e.isDawn) pillStyle='background:#FAEEDA;color:#854F0B;';
+    if(e.isMeal) pillStyle='background:#FAEEDA;color:#854F0B;';
+    if(e.isExam) pillStyle='background:#FCEBEB;color:#A32D2D;';
+    html+=`<div class="${cls}">${bar}
+      <div class="tc"><span class="tc-s">${mToT(e.s)}</span><span class="tc-e">${mToT(e.e)}</span></div>
+      <div class="pill" style="${pillStyle}">${e.l}${nowTag}<div class="pill-sub">${e.a}</div></div>
+      <span class="row-ic">${e.ic}</span>
+    </div>`;
+  }); }
+  html += '</div>';
+  document.getElementById('tt-content').innerHTML = html;
+}
+
+function initDayTabs(){
+  document.querySelectorAll('.day-tab').forEach((t,i)=>{
+    t.classList.toggle('active', DAYTABS[i]===curDay);
+  });
+}
+
+// ════════════════════════════════════════
+//  지도
+// ════════════════════════════════════════
+function buildMap(){
+  const bx = Math.round((126.740-V.minLng)/(V.maxLng-V.minLng)*MW);
+  const ry = Math.round((1-(37.476-V.minLat)/(V.maxLat-V.minLat))*MH);
+  const p = {};
+  Object.keys(LOCS).forEach(k=>{ p[k]=toXY(LOCS[k].lat,LOCS[k].lng); });
+  document.getElementById('mapSvg').innerHTML=`<svg style="position:absolute;inset:0;width:100%;height:100%;" viewBox="0 0 ${MW} ${MH}" preserveAspectRatio="none">
+    <rect width="${MW}" height="${MH}" fill="#e8efe4"/>
+    <line x1="${bx}" y1="0" x2="${bx}" y2="${MH}" stroke="#bbb" stroke-width="1" stroke-dasharray="5,3" opacity="0.5"/>
+    <text x="${Math.round(bx/2)}" y="14" font-size="10" fill="#555" text-anchor="middle" opacity=".8">인천시</text>
+    <text x="${Math.round((bx+MW)/2)}" y="14" font-size="10" fill="#555" text-anchor="middle" opacity=".8">부천시</text>
+    <line x1="0" y1="${ry}" x2="${MW}" y2="${ry-2}" stroke="#c4c0b5" stroke-width="4"/>
+    <line x1="0" y1="${Math.round(p.momWork.y)}" x2="${bx}" y2="${Math.round(p.momWork.y)}" stroke="#d0ccc4" stroke-width="2"/>
+    <line x1="0" y1="${Math.round(p.dadWork.y)}" x2="${bx}" y2="${Math.round(p.dadWork.y)}" stroke="#d0ccc4" stroke-width="2"/>
+    <line x1="${Math.round(p.momWork.x)}" y1="0" x2="${Math.round(p.momWork.x)}" y2="${MH}" stroke="#d0ccc4" stroke-width="1.5"/>
+    <line x1="${bx}" y1="${Math.round(p.home.y)}" x2="${MW}" y2="${Math.round(p.home.y)}" stroke="#d0ccc4" stroke-width="2"/>
+    <line x1="${bx}" y1="${Math.round(p.hwanSch.y)}" x2="${MW}" y2="${Math.round(p.hwanSch.y)}" stroke="#d0ccc4" stroke-width="1.5"/>
+    <line x1="${bx}" y1="${Math.round(p.math.y)}" x2="${MW}" y2="${Math.round(p.math.y)}" stroke="#d0ccc4" stroke-width="1.5"/>
+    <line x1="${bx}" y1="${Math.round(p.eng.y)}" x2="${MW}" y2="${Math.round(p.eng.y)}" stroke="#d0ccc4" stroke-width="1.5"/>
+    <line x1="${Math.round(p.home.x)}" y1="0" x2="${Math.round(p.home.x)}" y2="${MH}" stroke="#d0ccc4" stroke-width="2"/>
+    <line x1="${Math.round(p.math.x)}" y1="0" x2="${Math.round(p.math.x)}" y2="${MH}" stroke="#d0ccc4" stroke-width="1.5"/>
+    <line x1="${Math.round(p.church.x)}" y1="0" x2="${Math.round(p.church.x)}" y2="${MH}" stroke="#d0ccc4" stroke-width="1.5"/>
+    <line x1="${Math.round(p.junSch.x)}" y1="0" x2="${Math.round(p.junSch.x)}" y2="${MH}" stroke="#d0ccc4" stroke-width="1.5"/>
+  </svg>`;
+
+  const wrap=document.getElementById('mapWrap');
+  const sw=wrap.offsetWidth, sh=wrap.offsetHeight;
+  document.getElementById('place-pins').innerHTML=Object.values(LOCS).map(loc=>{
+    const {x,y}=toXY(loc.lat,loc.lng);
+    return `<div class="place-pin" style="left:${x/MW*sw}px;top:${y/MH*sh}px;">
+      <div class="pdot" style="background:${loc.dot};"></div>
+      <div class="plbl">${loc.lbl}</div>
+    </div>`;
+  }).join('');
+}
+
+function updatePins(){
+  const wrap=document.getElementById('mapWrap');
+  if(!wrap) return;
+  const sw=wrap.offsetWidth, sh=wrap.offsetHeight;
+  MEMBERS.forEach((_,i)=>{
+    const ev=getCur(i), c=getCoord(ev);
+    const {x,y}=toXY(c.lat,c.lng);
+    const pin=document.getElementById('pp'+i);
+    if(pin){ pin.style.left=Math.round(x/MW*sw)+'px'; pin.style.top=Math.round(y/MH*sh)+'px'; }
+  });
+}
+
+function renderLiveList(){
+  const now=getNow();
+  document.getElementById('live-list').innerHTML=MEMBERS.map((m,i)=>{
+    const ev=getCur(i), ret=getRet(i);
+    const el=(!ev.mv&&ev.s&&ev.s>0)?(now-ev.s):null;
+    const elStr=el&&el>0?(el>=60?Math.floor(el/60)+'시간 ':'')+el%60+'분째':'';
+    let rh='';
+    if(ret!==null){
+      const d=ret-now;
+      if(d>60) rh=`<div class="ret-label">오늘 귀가 예정</div><div class="ret-time">${mToT(ret)}</div>`;
+      else if(d>0) rh=`<div class="ret-label">귀가까지</div><div class="ret-soon">${d}분 후</div>`;
+    } else rh=`<div class="ret-done">귀가 완료 🏠</div>`;
+    return `<div class="live-row">
+      <div class="live-av" style="background:${m.bg};color:${m.color};">${m.short}</div>
+      <div style="flex:1;min-width:0;">
+        <div class="live-place"><span class="live-dot" style="background:${m.color};"></span>${ev.ic} ${ev.l}</div>
+        <div class="live-addr">${ev.a}${elStr?' · '+elStr:''}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;">${rh}</div>
+    </div>`;
+  }).join('');
+}
+
+// ════════════════════════════════════════
+//  체류 분석 차트
+// ════════════════════════════════════════
+const STATS = [
+  { labels:['인천시교육청','집/새벽예배','이동'], values:[9,5.5,1.5], colors:['#185FA5','#B5D4F4','#85B7EB'] },
+  { labels:['인천작전초','집','이동'],             values:[8.5,5.5,0.75], colors:['#0F6E56','#9FE1CB','#5DCAA5'] },
+  { labels:['중흥고','수학/영어학원','집','이동'], values:[8,3.5,3,1.5], colors:['#534AB7','#7F77DD','#EEEDFE','#D3D1C7'] },
+  { labels:['중흥중','수학/영어학원','집','이동'], values:[7.5,3.5,3.5,1.5], colors:['#BA7517','#EF9F27','#FAC775','#D3D1C7'] },
+];
+const BAR_LABELS = ['15시','16시','17시','18시','19시','20시','21시','22시'];
+const BAR_DATA = [
+  { v:[9,9,5,3,2,2,1,0], bg:['#185FA5','#185FA5','#85B7EB','#E6F1FB','#E6F1FB','#E6F1FB','#E6F1FB','#E6F1FB'] },
+  { v:[9,5,3,3,3,2,0,0], bg:['#0F6E56','#9FE1CB','#9FE1CB','#9FE1CB','#9FE1CB','#9FE1CB','#9FE1CB','#9FE1CB'] },
+  { v:[8,3,5,8,9,9,9,0], bg:['#534AB7','#EEEDFE','#FAEEDA','#7F77DD','#7F77DD','#7F77DD','#AFA9EC','#EEEDFE'] },
+  { v:[8,8,4,5,8,7,5,0], bg:['#BA7517','#EF9F27','#FAEEDA','#EF9F27','#EF9F27','#FAEEDA','#FAEEDA','#FAEEDA'] },
+];
+
+function initCharts(){
+  const idx = parseInt(document.getElementById('stats-sel').value);
+  const sd=STATS[idx], bd=BAR_DATA[idx];
+  const tot=sd.values.reduce((a,b)=>a+b,0);
+  document.getElementById('pie-legend').innerHTML=sd.labels.map((l,i)=>
+    `<span class="legend-item"><span class="legend-dot" style="background:${sd.colors[i]};"></span>${l} ${Math.round(sd.values[i]*100/tot)}%</span>`
+  ).join('');
+  if(pieCI) pieCI.destroy();
+  if(barCI) barCI.destroy();
+  pieCI = new Chart(document.getElementById('pieChart'),{
+    type:'doughnut',
+    data:{labels:sd.labels,datasets:[{data:sd.values,backgroundColor:sd.colors,borderWidth:2,borderColor:'#fff'}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.label}: ${c.parsed.toFixed(1)}h`}}}}
+  });
+  barCI = new Chart(document.getElementById('barChart'),{
+    type:'bar',
+    data:{labels:BAR_LABELS,datasets:[{data:bd.v,backgroundColor:bd.bg,borderRadius:3,borderSkipped:false}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{display:false,min:0,max:12},x:{ticks:{font:{size:11},autoSkip:false}}}}
+  });
+}
+function updateCharts(){ initCharts(); }
+
+// ════════════════════════════════════════
+//  수정/조정
+// ════════════════════════════════════════
+function renderEdit(){
+  document.getElementById('edit-cards').innerHTML = MEMBERS.map((m,i)=>{
+    const evs = getEvs(i, getTK());
+    return `<div class="card">
+      <div class="edit-header">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="width:28px;height:28px;border-radius:50%;background:${m.bg};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:${m.color};">${m.short}</div>
+          <span class="edit-title">${m.name} (${m.label})</span>
+        </div>
+        <button class="add-btn">+ 추가</button>
+      </div>
+      ${evs.map(e=>`<div class="edit-row">
+        <div class="edit-dot" style="background:${e.lk&&LOCS[e.lk]?LOCS[e.lk].dot:'#ccc'};"></div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:12px;font-weight:600;color:var(--text);">${e.l}</div>
+          <div style="font-size:10px;color:var(--text2);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${e.a}</div>
+        </div>
+        <span class="edit-time">${mToT(e.s)}–${mToT(e.e)}</span>
+        <span class="edit-more">···</span>
+      </div>`).join('')}
+    </div>`;
+  }).join('');
+}
+
+// ════════════════════════════════════════
+//  오늘 날짜
+// ════════════════════════════════════════
+function setDate(){
+  const d=new Date(), days=['일','월','화','수','목','금','토'];
+  document.getElementById('today-date').textContent=`${d.getMonth()+1}월 ${d.getDate()}일 (${days[d.getDay()]})`;
+}
+
+// ════════════════════════════════════════
+//  초기화
+// ════════════════════════════════════════
+setDate();
+initDayTabs();
+renderMembersStrip();
+renderTT();
+
+// 1분마다 자동 갱신
+setInterval(()=>{
+  renderMembersStrip();
+  if(curDay===getTK()) renderTT();
+  updatePins();
+  renderLiveList();
+}, 60000);
+</script>
+</body>
+</html>
