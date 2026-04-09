@@ -139,12 +139,11 @@
     <span class="app-title">FamilySync</span>
     <div class="header-right">
       <span class="today-date" id="today-date"></span>
-      <button class="exam-btn" id="exam-btn" onclick="toggleExam()">시험기간</button>
     </div>
   </div>
   <div class="nav">
     <button class="nav-btn active" onclick="showTab('tt',this)">타임테이블</button>
-    <button class="nav-btn" onclick="showTab('live',this)">실시간 위치</button>
+    <button class="nav-btn" onclick="showTab('live',this)">위치 예상</button>
     <button class="nav-btn" onclick="showTab('stats',this)">체류 분석</button>
     <button class="nav-btn" onclick="showTab('edit',this)">수정/조정</button>
   </div>
@@ -204,8 +203,8 @@
       </div>
     </div>
     <div class="card" style="padding:14px 16px;">
-      <p class="section-label" style="margin-bottom:10px;">오늘 타임라인</p>
-      <div style="position:relative;width:100%;height:220px;">
+      <p class="section-label" style="margin-bottom:10px;">24시간 타임라인</p>
+      <div style="position:relative;width:100%;height:200px;">
         <canvas id="barChart" role="img" aria-label="시간대별 장소 타임라인 바 차트">시간대별 타임라인</canvas>
       </div>
     </div>
@@ -213,10 +212,11 @@
 
   <!-- ══ 수정/조정 ══ -->
   <div id="tab-edit" class="hidden">
-    <div id="edit-cards"></div>
-    <div style="text-align:center;margin-top:12px;padding-bottom:20px;">
-      <p style="font-size:11px;color:var(--text2);line-height:1.6;">일정 변경은 Claude에게 요청 후<br>새 index.html을 GitHub에 업로드하세요.</p>
+    <div style="background:#FFF8E1;border-radius:var(--radius-sm);padding:9px 13px;font-size:11px;color:#854F0B;line-height:1.6;margin-bottom:12px;">
+      + 버튼으로 오늘 임시 일정 추가 가능 · 추가한 일정은 이 기기에 저장됩니다<br>
+      <span style="color:var(--text3);">가족 간 실시간 동기화는 Firebase 연동 후 가능 (현재 준비 중)</span>
     </div>
+    <div id="edit-cards"></div>
   </div>
 
 </div>
@@ -554,7 +554,7 @@ function showTab(tab, btn){
   btn.classList.add('active');
   if(tab==='live'){ buildMap(); updatePins(); renderLiveList(); }
   if(tab==='stats') setTimeout(initCharts,50);
-  if(tab==='edit') renderEdit();
+  if(tab==='edit') renderEdit(curM,getTK());
 }
 
 // ════════════════════════════════════════
@@ -706,19 +706,32 @@ function renderLiveList(){
   const now=getNow();
   document.getElementById('live-list').innerHTML=MEMBERS.map((m,i)=>{
     const ev=getCur(i), ret=getRet(i);
-    const el=(!ev.mv&&ev.s&&ev.s>0)?(now-ev.s):null;
-    const elStr=el&&el>0?(el>=60?Math.floor(el/60)+'시간 ':'')+el%60+'분째':'';
+    // 다음 일정 계산
+    const evs=getEvs(i);
+    let nxt=null;
+    for(let j=0;j<evs.length;j++){
+      if(now>=evs[j].s&&now<evs[j].e&&evs[j+1]){ nxt=evs[j+1]; break; }
+    }
     let rh='';
     if(ret!==null){
       const d=ret-now;
-      if(d>60) rh=`<div class="ret-label">오늘 귀가 예정</div><div class="ret-time">${mToT(ret)}</div>`;
-      else if(d>0) rh=`<div class="ret-label">귀가까지</div><div class="ret-soon">${d}분 후</div>`;
-    } else rh=`<div class="ret-done">귀가 완료 🏠</div>`;
+      if(d>60){
+        // 다음 일정이 있으면 함께 표시
+        const nxtStr = nxt ? `<div class="ret-label" style="margin-top:3px;">다음 · ${nxt.l}</div>` : '';
+        rh=`<div class="ret-label">귀가 예정</div><div class="ret-time">${mToT(ret)}</div>${nxtStr}`;
+      } else if(d>0){
+        rh=`<div class="ret-label">귀가까지</div><div class="ret-soon">${d}분 후</div>`;
+      }
+    } else {
+      rh=`<div style="font-size:11px;font-weight:600;color:#0F6E56;">집에 있을 예정 🏠</div>`;
+    }
+    // 이동수단 아이콘
+    const moveIcon = ev.mv ? ` <span style="font-size:11px;color:var(--text2);">${ev.ic}</span>` : '';
     return `<div class="live-row">
       <div class="live-av" style="background:${m.bg};color:${m.color};">${m.short}</div>
       <div style="flex:1;min-width:0;">
-        <div class="live-place"><span class="live-dot" style="background:${m.color};"></span>${ev.ic} ${ev.l}</div>
-        <div class="live-addr">${ev.a}${elStr?' · '+elStr:''}</div>
+        <div class="live-place"><span class="live-dot" style="background:${m.color};"></span>${ev.l}${moveIcon}</div>
+        <div class="live-addr">${ev.a}</div>
       </div>
       <div style="text-align:right;flex-shrink:0;">${rh}</div>
     </div>`;
@@ -734,12 +747,34 @@ const STATS = [
   { labels:['중흥고','수학/영어학원','집','이동'], values:[8,3.5,3,1.5], colors:['#534AB7','#7F77DD','#EEEDFE','#D3D1C7'] },
   { labels:['중흥중','수학/영어학원','집','이동'], values:[7.5,3.5,3.5,1.5], colors:['#BA7517','#EF9F27','#FAC775','#D3D1C7'] },
 ];
-const BAR_LABELS = ['15시','16시','17시','18시','19시','20시','21시','22시'];
+// 24시간 타임라인 데이터
+const BAR_LABELS = Array.from({length:24},(_,i)=>i+'시');
+// 각 시간대별 장소색 (아빠/엄마/환이/준이 평일 기준)
 const BAR_DATA = [
-  { v:[9,9,5,3,2,2,1,0], bg:['#185FA5','#185FA5','#85B7EB','#E6F1FB','#E6F1FB','#E6F1FB','#E6F1FB','#E6F1FB'] },
-  { v:[9,5,3,3,3,2,0,0], bg:['#0F6E56','#9FE1CB','#9FE1CB','#9FE1CB','#9FE1CB','#9FE1CB','#9FE1CB','#9FE1CB'] },
-  { v:[8,3,5,8,9,9,9,0], bg:['#534AB7','#EEEDFE','#FAEEDA','#7F77DD','#7F77DD','#7F77DD','#AFA9EC','#EEEDFE'] },
-  { v:[8,8,4,5,8,7,5,0], bg:['#BA7517','#EF9F27','#FAEEDA','#EF9F27','#EF9F27','#FAEEDA','#FAEEDA','#FAEEDA'] },
+  // 아빠: 0-4취침, 5새벽준비, 5-6교회, 6-7집, 7-8출근이동, 8-18직장, 18-19귀가이동, 19-23집
+  { v:Array(24).fill(6),
+    bg:['#EEEDFE','#EEEDFE','#EEEDFE','#EEEDFE','#EEEDFE',
+        '#FAC775','#FAC775','#B5D4F4',
+        '#185FA5','#185FA5','#185FA5','#185FA5','#185FA5','#185FA5','#185FA5','#185FA5','#185FA5','#185FA5','#185FA5',
+        '#B5D4F4','#E6F1FB','#E6F1FB','#E6F1FB','#E6F1FB'] },
+  // 엄마: 0-5취침, 6-7기상, 7-8출근, 8-16직장, 16-17귀가, 17-23집
+  { v:Array(24).fill(6),
+    bg:['#EEEDFE','#EEEDFE','#EEEDFE','#EEEDFE','#EEEDFE','#EEEDFE',
+        '#9FE1CB','#9FE1CB',
+        '#0F6E56','#0F6E56','#0F6E56','#0F6E56','#0F6E56','#0F6E56','#0F6E56','#0F6E56','#0F6E56',
+        '#9FE1CB','#E1F5EE','#E1F5EE','#E1F5EE','#E1F5EE','#E1F5EE','#E1F5EE'] },
+  // 환이(월수금): 0-5취침, 6기상, 6-8집, 8-16학교, 16집저녁, 17자전거, 17-21수학학원, 21-23귀가집
+  { v:Array(24).fill(6),
+    bg:['#EEEDFE','#EEEDFE','#EEEDFE','#EEEDFE','#EEEDFE',
+        '#EEEDFE','#EEEDFE','#EEEDFE',
+        '#534AB7','#534AB7','#534AB7','#534AB7','#534AB7','#534AB7','#534AB7','#534AB7',
+        '#FAEEDA','#7F77DD','#7F77DD','#7F77DD','#7F77DD','#EEEDFE','#EEEDFE','#EEEDFE'] },
+  // 준이(월수금): 0-5취침, 6기상, 6-8집, 8-15학교, 15-19수학학원, 19집저녁, 20-23집
+  { v:Array(24).fill(6),
+    bg:['#FAEEDA','#FAEEDA','#FAEEDA','#FAEEDA','#FAEEDA',
+        '#FAEEDA','#FAEEDA','#FAEEDA',
+        '#BA7517','#BA7517','#BA7517','#BA7517','#BA7517','#BA7517','#BA7517',
+        '#EF9F27','#EF9F27','#EF9F27','#EF9F27','#FAEEDA','#FAEEDA','#FAEEDA','#FAEEDA','#FAEEDA'] },
 ];
 
 function initCharts(){
@@ -756,10 +791,20 @@ function initCharts(){
     data:{labels:sd.labels,datasets:[{data:sd.values,backgroundColor:sd.colors,borderWidth:2,borderColor:'#fff'}]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.label}: ${c.parsed.toFixed(1)}h`}}}}
   });
+  const bd=BAR_DATA[idx];
   barCI = new Chart(document.getElementById('barChart'),{
     type:'bar',
-    data:{labels:BAR_LABELS,datasets:[{data:bd.v,backgroundColor:bd.bg,borderRadius:3,borderSkipped:false}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{display:false,min:0,max:12},x:{ticks:{font:{size:11},autoSkip:false}}}}
+    data:{labels:BAR_LABELS,datasets:[{data:bd.v,backgroundColor:bd.bg,borderRadius:2,borderSkipped:false}]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:(c)=>{
+        const labels24=['취침','취침','취침','취침','취침','새벽','새벽/집','이동',
+          '직장/학교','직장/학교','직장/학교','직장/학교','직장/학교','직장/학교','직장/학교','직장/학교',
+          '하교/귀가','학원','학원','학원','귀가/집','집','집','집'];
+        return ' '+labels24[c.dataIndex];
+      }}}},
+      scales:{y:{display:false,min:0,max:10},x:{ticks:{font:{size:9},maxRotation:0,autoSkip:true,maxTicksLimit:12}}}
+    }
   });
 }
 function updateCharts(){ initCharts(); }
@@ -767,29 +812,85 @@ function updateCharts(){ initCharts(); }
 // ════════════════════════════════════════
 //  수정/조정
 // ════════════════════════════════════════
-function renderEdit(){
-  document.getElementById('edit-cards').innerHTML = MEMBERS.map((m,i)=>{
-    const evs = getEvs(i, getTK());
-    return `<div class="card">
-      <div class="edit-header">
-        <div style="display:flex;align-items:center;gap:8px;">
-          <div style="width:28px;height:28px;border-radius:50%;background:${m.bg};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:${m.color};">${m.short}</div>
-          <span class="edit-title">${m.name} (${m.label})</span>
-        </div>
-        <button class="add-btn">+ 추가</button>
+let editTarget={mi:0,day:getTK()};
+let dragSrc=null;
+
+function renderEdit(mi,day){
+  if(mi===undefined)mi=0;
+  if(day===undefined)day=getTK();
+  editTarget={mi,day};
+  const m=MEMBERS[mi],evs=getEvs(mi,day);
+  const dayNames=['월','화','수','목','금','토','일'];
+  const mTabs=MEMBERS.map((mm,i)=>`<div onclick="renderEdit(${i},'${day}')" style="flex:1;text-align:center;padding:8px 2px;font-size:11px;font-weight:600;cursor:pointer;border-bottom:2px solid ${i===mi?'var(--blue)':'transparent'};color:${i===mi?'var(--blue)':'var(--text2)'};">${mm.label}</div>`).join('');
+  const dTabs=DAYTABS.map((d,idx)=>`<div onclick="renderEdit(${mi},'${d}')" style="flex-shrink:0;padding:5px 10px;border-radius:var(--radius-sm);font-size:11px;font-weight:600;cursor:pointer;border:1px solid ${d===day?'var(--blue)':'var(--border)'};background:${d===day?'var(--blue)':'var(--card)'};color:${d===day?'#fff':'var(--text2)'};">${dayNames[idx]}</div>`).join('');
+  const rows=evs.map((e,idx)=>{
+    const dot=e.lk&&LOCS[e.lk]?LOCS[e.lk].dot:'#ccc';
+    const delBtn=e.isExtra?`<span onclick="delEvent(${mi},'${day}',${e.s})" style="font-size:14px;color:var(--red);cursor:pointer;padding:0 4px;flex-shrink:0;">✕</span>`:'';
+    return`<div class="edit-row" draggable="true"
+      ondragstart="dragSrc=${idx}" ondragend="document.querySelectorAll('.edit-row').forEach(r=>r.style.borderTop='')"
+      ondragover="event.preventDefault();this.style.borderTop='2px solid var(--blue)'"
+      ondragleave="this.style.borderTop=''"
+      style="align-items:center;">
+      <span style="font-size:16px;color:var(--text3);cursor:grab;padding:0 4px;flex-shrink:0;">⠿</span>
+      <div class="edit-dot" style="background:${dot};margin-top:0;"></div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:12px;font-weight:600;">${e.l}${e.isExtra?' <span style="font-size:9px;background:#E6F1FB;color:#185FA5;padding:1px 5px;border-radius:8px;">추가됨</span>':''}</div>
+        <div style="font-size:10px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${e.a}</div>
       </div>
-      ${evs.map(e=>`<div class="edit-row">
-        <div class="edit-dot" style="background:${e.lk&&LOCS[e.lk]?LOCS[e.lk].dot:'#ccc'};"></div>
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:12px;font-weight:600;color:var(--text);">${e.l}</div>
-          <div style="font-size:10px;color:var(--text2);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${e.a}</div>
-        </div>
-        <span class="edit-time">${mToT(e.s)}–${mToT(e.e)}</span>
-        <span class="edit-more">···</span>
-      </div>`).join('')}
+      <span style="font-size:11px;color:var(--text2);white-space:nowrap;">${mToT(e.s)}–${mToT(e.e)}</span>
+      ${delBtn}
     </div>`;
   }).join('');
+  document.getElementById('edit-cards').innerHTML=`<div class="card" style="overflow:visible;">
+    <div style="display:flex;border-bottom:0.5px solid var(--border);">${mTabs}</div>
+    <div style="display:flex;gap:4px;padding:10px 12px;overflow-x:auto;">${dTabs}</div>
+    <div style="padding:10px 16px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+      <span style="font-size:14px;font-weight:600;">${m.name} · ${dayNames[DAYTABS.indexOf(day)]}요일</span>
+      <button class="add-btn" onclick="openModal(${mi},'${day}')">+ 추가</button>
+    </div>
+    <div>${rows}</div>
+  </div>`;
 }
+
+function delEvent(mi,day,startMin){
+  const ex=loadExtra(),key=\`\${mi}_\${day}\`;
+  if(ex[key]){ex[key]=ex[key].filter(e=>e.s!==startMin);saveExtra(ex);}
+  renderEdit(mi,day);renderMembersStrip();renderTT();
+}
+
+// 모달
+function openModal(mi,day){
+  editTarget={mi,day};
+  document.getElementById('m-label').value='';
+  document.getElementById('m-addr').value='';
+  document.getElementById('m-start').value='';
+  document.getElementById('m-end').value='';
+  document.getElementById('modal-title').textContent=MEMBERS[mi].name+' 일정 추가';
+  document.getElementById('modal').classList.remove('hidden');
+}
+function closeModal(){document.getElementById('modal').classList.add('hidden');}
+function saveEvent(){
+  const label=document.getElementById('m-label').value.trim();
+  const addr=document.getElementById('m-addr').value.trim()||A.home;
+  const start=document.getElementById('m-start').value;
+  const end=document.getElementById('m-end').value;
+  const ic=document.getElementById('m-icon').value;
+  if(!label||!start||!end){alert('장소와 시간을 모두 입력해주세요.');return;}
+  const s=tToM(start),e=tToM(end);
+  if(e<=s){alert('종료 시간은 시작 시간보다 나중이어야 해요.');return;}
+  const ex=loadExtra(),key=\`\${editTarget.mi}_\${editTarget.day}\`;
+  if(!ex[key])ex[key]=[];
+  ex[key].push({s,e,l:label,ic,a:addr,isExtra:true});
+  ex[key].sort((a,b)=>a.s-b.s);
+  saveExtra(ex);
+  closeModal();
+  renderEdit(editTarget.mi,editTarget.day);
+  renderMembersStrip();renderTT();
+  alert('✅ "'+label+'" 일정이 추가됐어요!');
+}
+function tToM(t){const[h,m]=t.split(':').map(Number);return h*60+m;}
+function loadExtra(){try{return JSON.parse(localStorage.getItem('fs_extra')||'{}');}catch(e){return{};}}
+function saveExtra(ex){localStorage.setItem('fs_extra',JSON.stringify(ex));}
 
 // ════════════════════════════════════════
 //  오늘 날짜
@@ -815,5 +916,45 @@ setInterval(()=>{
   renderLiveList();
 }, 60000);
 </script>
+
+<!-- 일정 추가 모달 -->
+<div id="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:flex-end;justify-content:center;" onclick="if(event.target===this)closeModal()">
+  <div style="background:var(--card);border-radius:var(--radius) var(--radius) 0 0;width:100%;max-width:480px;padding:20px 18px 40px;">
+    <div style="font-size:16px;font-weight:700;margin-bottom:16px;" id="modal-title">일정 추가</div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:4px;">장소 / 내용</div>
+    <input id="m-label" type="text" placeholder="예: 태권도, 독서실..." style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;margin-bottom:10px;background:var(--bg);">
+    <div style="font-size:12px;color:var(--text2);margin-bottom:4px;">주소 (선택)</div>
+    <input id="m-addr" type="text" placeholder="예: 부천시 ..." style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;margin-bottom:10px;background:var(--bg);">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+      <div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:4px;">시작 시간</div>
+        <input id="m-start" type="time" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;background:var(--bg);">
+      </div>
+      <div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:4px;">종료 시간</div>
+        <input id="m-end" type="time" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;background:var(--bg);">
+      </div>
+    </div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:4px;">아이콘</div>
+    <select id="m-icon" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;margin-bottom:20px;background:var(--bg);">
+      <option value="📍">📍 기타</option>
+      <option value="🏫">🏫 학교/학원</option>
+      <option value="📚">📚 수학학원</option>
+      <option value="📖">📖 영어학원</option>
+      <option value="📝">📝 자율학습</option>
+      <option value="⛪">⛪ 교회</option>
+      <option value="🎻">🎻 오케스트라</option>
+      <option value="🏠">🏠 집</option>
+      <option value="🚇">🚇 지하철</option>
+      <option value="🚲">🚲 자전거</option>
+      <option value="🚌">🚌 버스</option>
+      <option value="🍚">🍚 식사</option>
+    </select>
+    <div style="display:flex;gap:8px;">
+      <button onclick="closeModal()" style="flex:1;padding:12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:none;font-size:14px;font-weight:600;cursor:pointer;">취소</button>
+      <button onclick="saveEvent()" style="flex:2;padding:12px;border:none;border-radius:var(--radius-sm);background:var(--blue);color:#fff;font-size:14px;font-weight:600;cursor:pointer;">저장</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
