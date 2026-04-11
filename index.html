@@ -188,8 +188,8 @@
   <!-- ══ 체류 분석 ══ -->
   <div id="tab-stats" class="hidden">
     <div class="card" style="padding:14px 16px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-        <p class="section-label" style="margin:0;">오늘의 체류 분석</p>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <p class="section-label" style="margin:0;">체류 분석</p>
         <select class="stats-sel" id="stats-sel" onchange="updateCharts()">
           <option value="0">이슬기 (아빠)</option>
           <option value="1">이루다 (엄마)</option>
@@ -197,6 +197,7 @@
           <option value="3">준이 (중1)</option>
         </select>
       </div>
+      <div id="stats-day-tabs" style="display:flex;gap:4px;overflow-x:auto;padding-bottom:6px;scrollbar-width:none;margin-bottom:10px;"></div>
       <div class="legend" id="pie-legend"></div>
       <div style="position:relative;width:100%;height:200px;">
         <canvas id="pieChart" role="img" aria-label="장소별 체류 시간 비율 도넛 차트">장소별 체류 시간 비율</canvas>
@@ -205,7 +206,7 @@
     <div class="card" style="padding:14px 16px;">
       <p class="section-label" style="margin-bottom:10px;">24시간 타임라인</p>
       <div style="position:relative;width:100%;height:200px;">
-        <canvas id="barChart" role="img" aria-label="시간대별 장소 타임라인 바 차트">시간대별 타임라인</canvas>
+        <canvas id="barChart" role="img" aria-label="24시간 타임라인">24시간 타임라인</canvas>
       </div>
     </div>
   </div>
@@ -213,8 +214,7 @@
   <!-- ══ 수정/조정 ══ -->
   <div id="tab-edit" class="hidden">
     <div style="background:#FFF8E1;border-radius:var(--radius-sm);padding:9px 13px;font-size:11px;color:#854F0B;line-height:1.6;margin-bottom:12px;">
-      + 버튼으로 오늘 임시 일정 추가 가능 · 추가한 일정은 이 기기에 저장됩니다<br>
-      <span style="color:var(--text3);">가족 간 실시간 동기화는 Firebase 연동 후 가능 (현재 준비 중)</span>
+      + 버튼으로 임시 일정 추가 가능 · 추가한 일정은 이 기기에 저장됩니다
     </div>
     <div id="edit-cards"></div>
   </div>
@@ -553,7 +553,7 @@ function showTab(tab, btn){
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   if(tab==='live'){ buildMap(); updatePins(); renderLiveList(); }
-  if(tab==='stats') setTimeout(initCharts,50);
+  if(tab==='stats'){ statDay=getTK(); setTimeout(renderStatsTab,50); }
   if(tab==='edit') renderEdit(curM,getTK());
 }
 
@@ -739,71 +739,148 @@ function renderLiveList(){
 }
 
 // ════════════════════════════════════════
-//  체류 분석 차트
+//  체류 분석 — 실제 스케줄에서 동적 계산
 // ════════════════════════════════════════
-const STATS = [
-  { labels:['인천시교육청','집/새벽예배','이동'], values:[9,5.5,1.5], colors:['#185FA5','#B5D4F4','#85B7EB'] },
-  { labels:['인천작전초','집','이동'],             values:[8.5,5.5,0.75], colors:['#0F6E56','#9FE1CB','#5DCAA5'] },
-  { labels:['중흥고','수학/영어학원','집','이동'], values:[8,3.5,3,1.5], colors:['#534AB7','#7F77DD','#EEEDFE','#D3D1C7'] },
-  { labels:['중흥중','수학/영어학원','집','이동'], values:[7.5,3.5,3.5,1.5], colors:['#BA7517','#EF9F27','#FAC775','#D3D1C7'] },
-];
-// 24시간 타임라인 데이터
 const BAR_LABELS = Array.from({length:24},(_,i)=>i+'시');
-// 각 시간대별 장소색 (아빠/엄마/환이/준이 평일 기준)
-const BAR_DATA = [
-  // 아빠: 0-4취침, 5새벽준비, 5-6교회, 6-7집, 7-8출근이동, 8-18직장, 18-19귀가이동, 19-23집
-  { v:Array(24).fill(6),
-    bg:['#EEEDFE','#EEEDFE','#EEEDFE','#EEEDFE','#EEEDFE',
-        '#FAC775','#FAC775','#B5D4F4',
-        '#185FA5','#185FA5','#185FA5','#185FA5','#185FA5','#185FA5','#185FA5','#185FA5','#185FA5','#185FA5','#185FA5',
-        '#B5D4F4','#E6F1FB','#E6F1FB','#E6F1FB','#E6F1FB'] },
-  // 엄마: 0-5취침, 6-7기상, 7-8출근, 8-16직장, 16-17귀가, 17-23집
-  { v:Array(24).fill(6),
-    bg:['#EEEDFE','#EEEDFE','#EEEDFE','#EEEDFE','#EEEDFE','#EEEDFE',
-        '#9FE1CB','#9FE1CB',
-        '#0F6E56','#0F6E56','#0F6E56','#0F6E56','#0F6E56','#0F6E56','#0F6E56','#0F6E56','#0F6E56',
-        '#9FE1CB','#E1F5EE','#E1F5EE','#E1F5EE','#E1F5EE','#E1F5EE','#E1F5EE'] },
-  // 환이(월수금): 0-5취침, 6기상, 6-8집, 8-16학교, 16집저녁, 17자전거, 17-21수학학원, 21-23귀가집
-  { v:Array(24).fill(6),
-    bg:['#EEEDFE','#EEEDFE','#EEEDFE','#EEEDFE','#EEEDFE',
-        '#EEEDFE','#EEEDFE','#EEEDFE',
-        '#534AB7','#534AB7','#534AB7','#534AB7','#534AB7','#534AB7','#534AB7','#534AB7',
-        '#FAEEDA','#7F77DD','#7F77DD','#7F77DD','#7F77DD','#EEEDFE','#EEEDFE','#EEEDFE'] },
-  // 준이(월수금): 0-5취침, 6기상, 6-8집, 8-15학교, 15-19수학학원, 19집저녁, 20-23집
-  { v:Array(24).fill(6),
-    bg:['#FAEEDA','#FAEEDA','#FAEEDA','#FAEEDA','#FAEEDA',
-        '#FAEEDA','#FAEEDA','#FAEEDA',
-        '#BA7517','#BA7517','#BA7517','#BA7517','#BA7517','#BA7517','#BA7517',
-        '#EF9F27','#EF9F27','#EF9F27','#EF9F27','#FAEEDA','#FAEEDA','#FAEEDA','#FAEEDA','#FAEEDA'] },
-];
+
+// 이벤트 → 색상
+function evColor(e){
+  if(!e) return '#E8E8E0';
+  if(e.isDawn) return '#FAC775';
+  if(e.isMeal) return '#EF9F27';
+  if(e.isExam) return '#F7C1C1';
+  if(e.lk && LOCS[e.lk]) return LOCS[e.lk].dot;
+  if(e.mv) return '#C8C4BA';
+  return '#D8D4CC';
+}
+
+// 이벤트 → 카테고리 이름 (파이차트용 집계)
+function evCategory(e){
+  const l = e.l;
+  if(l.includes('교육청') || l.includes('작전초')) return '직장';
+  if(l.includes('중흥고') || l.includes('중흥중')) return '학교';
+  if(l.includes('수학학원')) return '수학학원';
+  if(l.includes('영어학원')) return '영어학원';
+  if(l.includes('국어학원')) return '국어학원';
+  if(l.includes('오케스트라')) return '오케스트라';
+  if(l.includes('교회') || l.includes('찬양') || l.includes('예배') || l.includes('새벽')) return '교회';
+  if(l.includes('저녁') || l.includes('식사')) return '식사';
+  if(l.includes('이동') || l.includes('귀가') || l.includes('출근') || l.includes('등교')) return '이동';
+  if(l.includes('기상') || l.includes('준비')) return '준비';
+  if(l.includes('집') || l.includes('휴식') || l.includes('자유') || l.includes('취침')) return '집/휴식';
+  return '기타';
+}
+
+// 카테고리 → 색상
+const CAT_COLOR = {
+  '직장':'#185FA5', '학교':'#534AB7', '수학학원':'#3B6D11', '영어학원':'#639922',
+  '국어학원':'#3C3489', '오케스트라':'#97C459', '교회':'#EF9F27',
+  '식사':'#EF9F27', '이동':'#B8B4AC', '준비':'#9FE1CB',
+  '집/휴식':'#D0CCC4', '취침':'#C0BCB4', '기타':'#C8C4BA',
+};
+
+// 스케줄에서 실제 체류 시간 계산
+function calcStats(mi, day){
+  const evs = getEvs(mi, day);
+
+  // 24시간 바 차트용 (시간당 대표 이벤트)
+  const barColors = Array(24).fill('#C0BCB4'); // 기본: 취침
+  const barLabels24 = Array(24).fill('취침');
+
+  evs.forEach(e => {
+    const hStart = Math.floor(e.s / 60);
+    const hEnd   = Math.min(Math.ceil(e.e / 60), 24);
+    const col = evColor(e);
+    const cat = evCategory(e);
+    for(let h = hStart; h < hEnd; h++){
+      barColors[h] = col;
+      barLabels24[h] = e.l;
+    }
+  });
+
+  // 파이차트용: 카테고리별 분 합산
+  const catMap = {};
+  evs.forEach(e => {
+    const cat = evCategory(e);
+    const mins = e.e - e.s;
+    catMap[cat] = (catMap[cat] || 0) + mins;
+  });
+  // 스케줄 외 시간 = 취침
+  const scheduled = evs.reduce((sum, e) => sum + (e.e - e.s), 0);
+  const sleeping = 1440 - scheduled;
+  if(sleeping > 0) catMap['취침'] = (catMap['취침'] || 0) + sleeping;
+
+  // 0분 제거 후 내림차순 정렬
+  const entries = Object.entries(catMap)
+    .filter(([,v]) => v > 0)
+    .sort((a,b) => b[1] - a[1]);
+
+  const labels  = entries.map(([k]) => k);
+  const values  = entries.map(([,v]) => Math.round(v / 60 * 10) / 10); // 시간 단위
+  const colors  = entries.map(([k]) => CAT_COLOR[k] || '#C8C4BA');
+
+  return { labels, values, colors, barColors, barLabels24 };
+}
+
+// 체류 분석 탭 — 요일 선택 포함
+let statDay = getTK();
+
+function renderStatsTab(){
+  // 요일 탭 업데이트
+  const dayNames = ['월','화','수','목','금','토','일'];
+  document.getElementById('stats-day-tabs').innerHTML = DAYTABS.map((d,i) =>
+    `<div onclick="selectStatDay('${d}',this)"
+      style="flex-shrink:0;padding:5px 11px;border-radius:var(--rs);font-size:12px;font-weight:600;cursor:pointer;
+      border:1px solid ${d===statDay?'var(--blue)':'var(--border)'};
+      background:${d===statDay?'var(--blue)':'var(--card)'};
+      color:${d===statDay?'#fff':'var(--text2)'};">${dayNames[i]}</div>`
+  ).join('');
+  initCharts();
+}
+
+function selectStatDay(day, el){
+  statDay = day;
+  renderStatsTab();
+}
 
 function initCharts(){
-  const idx = parseInt(document.getElementById('stats-sel').value);
-  const sd=STATS[idx], bd=BAR_DATA[idx];
-  const tot=sd.values.reduce((a,b)=>a+b,0);
-  document.getElementById('pie-legend').innerHTML=sd.labels.map((l,i)=>
-    `<span class="legend-item"><span class="legend-dot" style="background:${sd.colors[i]};"></span>${l} ${Math.round(sd.values[i]*100/tot)}%</span>`
+  const mi  = parseInt(document.getElementById('stats-sel').value);
+  const res = calcStats(mi, statDay);
+
+  // 파이 범례
+  const tot = res.values.reduce((a,b)=>a+b,0);
+  document.getElementById('pie-legend').innerHTML = res.labels.map((l,i)=>
+    `<span class="legend-item">
+      <span class="legend-dot" style="background:${res.colors[i]};"></span>
+      ${l} ${Math.round(res.values[i]/tot*100)}%
+     </span>`
   ).join('');
+
   if(pieCI) pieCI.destroy();
-  if(barCI) barCI.destroy();
+  if(barCI)  barCI.destroy();
+
   pieCI = new Chart(document.getElementById('pieChart'),{
     type:'doughnut',
-    data:{labels:sd.labels,datasets:[{data:sd.values,backgroundColor:sd.colors,borderWidth:2,borderColor:'#fff'}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.label}: ${c.parsed.toFixed(1)}h`}}}}
-  });
-  const bd=BAR_DATA[idx];
-  barCI = new Chart(document.getElementById('barChart'),{
-    type:'bar',
-    data:{labels:BAR_LABELS,datasets:[{data:bd.v,backgroundColor:bd.bg,borderRadius:2,borderSkipped:false}]},
+    data:{labels:res.labels,datasets:[{data:res.values,backgroundColor:res.colors,borderWidth:2,borderColor:'#fff'}]},
     options:{
       responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:(c)=>{
-        const labels24=['취침','취침','취침','취침','취침','새벽','새벽/집','이동',
-          '직장/학교','직장/학교','직장/학교','직장/학교','직장/학교','직장/학교','직장/학교','직장/학교',
-          '하교/귀가','학원','학원','학원','귀가/집','집','집','집'];
-        return ' '+labels24[c.dataIndex];
-      }}}},
-      scales:{y:{display:false,min:0,max:10},x:{ticks:{font:{size:9},maxRotation:0,autoSkip:true,maxTicksLimit:12}}}
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.label}: ${c.parsed.toFixed(1)}시간`}}}
+    }
+  });
+
+  barCI = new Chart(document.getElementById('barChart'),{
+    type:'bar',
+    data:{
+      labels:BAR_LABELS,
+      datasets:[{data:Array(24).fill(8),backgroundColor:res.barColors,borderRadius:2,borderSkipped:false}]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:(c)=>` ${res.barLabels24[c.dataIndex]}`}}},
+      scales:{
+        y:{display:false,min:0,max:10},
+        x:{ticks:{font:{size:9},maxRotation:0,autoSkip:true,maxTicksLimit:12}}
+      }
     }
   });
 }
@@ -853,7 +930,7 @@ function renderEdit(mi,day){
 }
 
 function delEvent(mi,day,startMin){
-  const ex=loadExtra(),key=\`\${mi}_\${day}\`;
+  const ex=loadExtra(),key=`\${mi}_\${day}`;
   if(ex[key]){ex[key]=ex[key].filter(e=>e.s!==startMin);saveExtra(ex);}
   renderEdit(mi,day);renderMembersStrip();renderTT();
 }
@@ -866,9 +943,9 @@ function openModal(mi,day){
   document.getElementById('m-start').value='';
   document.getElementById('m-end').value='';
   document.getElementById('modal-title').textContent=MEMBERS[mi].name+' 일정 추가';
-  document.getElementById('modal').classList.remove('hidden');
+  document.getElementById('modal').style.display='flex';
 }
-function closeModal(){document.getElementById('modal').classList.add('hidden');}
+function closeModal(){document.getElementById('modal').style.display='none';}
 function saveEvent(){
   const label=document.getElementById('m-label').value.trim();
   const addr=document.getElementById('m-addr').value.trim()||A.home;
@@ -878,7 +955,7 @@ function saveEvent(){
   if(!label||!start||!end){alert('장소와 시간을 모두 입력해주세요.');return;}
   const s=tToM(start),e=tToM(end);
   if(e<=s){alert('종료 시간은 시작 시간보다 나중이어야 해요.');return;}
-  const ex=loadExtra(),key=\`\${editTarget.mi}_\${editTarget.day}\`;
+  const ex=loadExtra(),key=`\${editTarget.mi}_\${editTarget.day}`;
   if(!ex[key])ex[key]=[];
   ex[key].push({s,e,l:label,ic,a:addr,isExtra:true});
   ex[key].sort((a,b)=>a.s-b.s);
